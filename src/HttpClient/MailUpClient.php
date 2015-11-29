@@ -7,52 +7,85 @@ use Codemaster\MailUp\HttpClient\Exception\MailUpException;
 
 /**
  * A client to interact with MailUP API.
+ *
+ * Implmeneted API:
+ *
+ * - `GET     Console/Authentication/Info`
+ * - `GET     Console/User/Lists`
+ * - `GET     Console/User/Emails`
+ * - `GET     Console/List/@id_List/Groups`
+ * - `POST    Console/List/@id_List/Group`
+ * - `PUT     Console/List/@id_List/Group/@id_Group`
+ * - `DELETE  Console/List/@id_List/Group/@id_Group`
+ * - `GET     Console/List/@id_List/Recipient/@id_Recipient/Groups`
+ * - `GET     Console/List/@id_List/Recipients/Subscribed`
+ * - `GET     Console/List/@id_List/Recipients/Unsubscribed`
+ * - `GET     Console/List/@id_List/Recipients/Pending`
+ * - `POST    Console/List/@id_List/Recipients`
+ * - `POST    Console/List/@id_List/Subscribe/@id_Recipient`
+ * - `DELETE  Console/List/@id_List/Unsubscribe/@id_Recipient`
+ * - `POST    Console/Group/@id_Group/Recipients`
+ * - `GET     Console/Group/@id_Group/Recipients`
+ * - `POST    Console/Group/@id_Group/Subscribe/@id_Recipient`
+ * - `DELETE  Console/Group/@id_Group/Unsubscribe/@id_Recipient`
+ * - `PUT     Console/Recipient/Detail`
+ * - `GET     Console/Recipient/DynamicFields`
+ *
+ * Some API are missing:
+ *
+ * - `POST     Console/Email/Send`
+ * - `GET      Console/Images`
+ * - `POST     Console/Images`
+ * - `DELETE   Console/Images`
+ * - `GET      Console/Import/@id_Import`
+ * - `POST     Console/Group/@id_Group/Email/@id_Message/Send`
+ * - `GET      Console/List/@id_List/Tags`
+ * - `POST     Console/List/@id_List/Tag`
+ * - `PUT      Console/List/@id_List/Tag/@id_Tag`
+ * - `DELETE   Console/List/@id_List/Tag/@id_Tag`
+ * - `GET      Console/List/@id_List/Email/@id_Message/Attachment`
+ * - `POST     Console/List/@id_List/Email/@id_Message/Attachment/@Slot`
+ * - `DELETE   Console/List/@id_List/Email/@id_Message/Attachment/@Slot`
+ * - `GET      Console/List/@id_List/Images`
+ * - `POST     Console/List/@id_List/Images`
+ * - `POST     Console/List/@id_List/Email/Template/@id_Template`
+ * - `POST     Console/List/@id_List/Email`
+ * - `PUT      Console/List/@id_List/Email/@id_Message`
+ * - `PUT      Console/List/@id_List/Email/@id_Message/OnlineVisibility`
+ * - `DELETE   Console/List/@id_List/Email/@id_Message`
+ * - `GET      Console/List/@id_List/Email/@id_Message`
+ * - `GET      Console/List/@id_List/Emails`
+ * - `GET      Console/List/@id_List/Online/Emails`
+ * - `GET      Console/List/@id_List/Archived/Emails`
+ * - `GET      Console/List/@id_List/Email/@id_Message/SendHistory`
+ * - `POST     Console/List/@id_List/Email/@id_Message/Send`
+ * - `GET      Console/List/@id_List/Templates`
+ * - `GET      Console/List/@id_List/Templates/@id_Template`
  */
 class MailUpClient extends MailUp
 {
     /**
-     * @var string
-     */
-    private $consoleUrl;
-
-    /**
-     * Create a new mailup client
+     * Get authentication information.
      *
-     * @param string $username
-     * @param string $password
-     * @param string $consoleUrl
+     * @return mixed REST Response
      */
-    public function __construct($username, $password, $consoleUrl = null)
+    public function getAuthenticationInfo()
     {
-        $this->consoleUrl = $consoleUrl;
+        $url = self::CONSOLE_ENDPOINT.'/Console/Authentication/Info';
 
-        parent::__construct($username, $password);
+        return $this->callMethodREST($url, 'GET');
     }
 
     /**
-     * Check authorization status.
+     * Retrieve the email messages (cloned and not cloned) by current user id..
      *
-     * @param  boolean $checkConsoleUrl
-     *
-     * @return mixed                    REST Response
-     *
-     * @throw  MailUpException
+     * @return mixed REST Response
      */
-    public function checkAuth($checkConsoleUrl = false)
+    public function getUserEmails()
     {
-        if ($checkConsoleUrl) {
-            if (empty($this->consoleUrl)) {
-                throw new MailUpException(1000, 'No Console URL supplied');
-            } else {
-                try {
-                    $this->callMethodFrontend($this->consoleUrl.'frontend/xmlSubscribe.aspx');
-                } catch (MailUpException $e) {
-                    throw new MailUpException(1000, sprintf('Invalid Console URL (%s)', $e->getMessage()));
-                }
-            }
-        }
+        $url = self::CONSOLE_ENDPOINT.'/Console/User/Emails';
 
-        return $this->callMethodREST(self::CONSOLE_ENDPOINT.'/Console/Authentication/Info', 'GET');
+        return $this->callMethodREST($url, 'GET');
     }
 
     /**
@@ -62,11 +95,13 @@ class MailUpClient extends MailUp
      */
     public function getLists()
     {
+        $url = self::CONSOLE_ENDPOINT.'/Console/User/Lists';
+
         $params = array(
             'orderby' => 'idList+asc',
         );
 
-        return $this->callMethodREST(self::CONSOLE_ENDPOINT.'/Console/User/Lists', 'GET', $params);
+        return $this->callMethodREST($url, 'GET', $params);
     }
 
     /**
@@ -78,35 +113,75 @@ class MailUpClient extends MailUp
      */
     public function getListGroups($listId)
     {
-        return $this->callMethodREST(self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Groups', 'GET');
-    }
-
-    /**
-     * Get array of recipients by email.
-     *
-     * @param  string $email
-     *
-     * @return mixed          REST Response
-     */
-    public function getRecipientByEmail($email)
-    {
-        $url = self::CONSOLE_ENDPOINT.'/Console/Recipient/'.$email;
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Groups';
 
         return $this->callMethodREST($url, 'GET');
     }
 
     /**
-     * Update recipient.
+     * Create a new group in the specified list.
      *
-     * @param  mixed $recipient
+     * @param  integer $listId
+     * @param  array   $params
      *
      * @return mixed            REST Response
      */
-    public function updateRecipient($recipient)
+    public function createListGroup($listId, array $params)
     {
-        $url = self::CONSOLE_ENDPOINT.'/Console/Recipient/Detail';
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Group';
 
-        return $this->callMethodREST($url, 'PUT', null, $recipient);
+        return $this->callMethodREST($url, 'POST', array(), $params);
+    }
+
+    /**
+     * Update a group in the specified list.
+     *
+     * @param  integer $listId
+     * @param  integer $groupId
+     * @param  array   $params
+     *
+     * @return mixed            REST Response
+     */
+    public function updateListGroup($listId, $groupId, array $params)
+    {
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Group/'.$groupId;
+
+        return $this->callMethodREST($url, 'PUT', null, $params);
+    }
+
+    /**
+     * Delete a group from the specified list.
+     *
+     * @param  integer $listId
+     * @param  integer $groupId
+     *
+     * @return mixed            REST Response
+     */
+    public function deleteListGroup($listId, $groupId)
+    {
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Group/'.$groupId;
+
+        return $this->callMethodREST($url, 'DELETE');
+    }
+
+    /**
+     * Get array of recipient in list by status.
+     *
+     * @param  string $listId
+     * @param  string $status
+     * @param  array  $params
+     *
+     * @return mixed              REST Response
+     */
+    public function getListRecipients($listId, $status = 'Subscribed', $params = array())
+    {
+        if (!in_array($status, array('Subscribed', 'Unsubscribed', 'Pending'))) {
+            throw new \InvalidArgumentException(sprintf('%s is not a valid status', $status));
+        }
+
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Recipients/'.$status;
+
+        return $this->callMethodREST($url, 'GET', $params);
     }
 
     /**
@@ -125,33 +200,14 @@ class MailUpClient extends MailUp
     }
 
     /**
-     * Get list of dynamic fields.
-     *
-     * @param  integer $pageSize
-     *
-     * @return mixed              REST Response
-     */
-    public function getFields($pageSize = 100)
-    {
-        $url = self::CONSOLE_ENDPOINT.'/Console/Recipient/DynamicFields';
-
-        $params = array(
-            'pageSize' => $pageSize,
-            'orderby' => 'Id',
-        );
-
-        return $this->callMethodREST($url, 'GET', $params);
-    }
-
-    /**
-     * Subscribe recipeints to a list
+     * Create recipients into a list
      *
      * @param  integer $listId
      * @param  array   $recipients
      *
      * @return mixed                REST Response
      */
-    public function subscribeToListNew($listId, $recipients)
+    public function importRecipientsInList($listId, $recipients)
     {
         $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Recipients';
 
@@ -159,7 +215,22 @@ class MailUpClient extends MailUp
     }
 
     /**
-     * Unsubscibe recipeint from list.
+     * Subscribe recipient to list.
+     *
+     * @param  integer $listId
+     * @param  integer $recipientId
+     *
+     * @return mixed                REST Response
+     */
+    public function listSubscribe($listId, $recipientId)
+    {
+        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Subscribe/'.$recipientId;
+
+        return $this->callMethodREST($url, 'POST');
+    }
+
+    /**
+     * Unsubscibe recipient from list.
      *
      * @param  integer $listId
      * @param  integer $recipientId
@@ -174,68 +245,32 @@ class MailUpClient extends MailUp
     }
 
     /**
-     * Check subscription status.
+     * Get group recipients.
      *
-     * @param  integer $listGuid
-     * @param  integer $listId
-     * @param  string  $email
+     * @param  integer $groupId
      *
-     * @return mixed              REST Response
+     * @return mixed                REST Response
      */
-    public function checkSubscriptionStatusFrontEnd($listGuid, $listId, $email)
+    public function getGroupRecipients($groupId)
     {
-        $url = $this->consoleUrl.'frontend/Xmlchksubscriber.aspx';
+        $url = self::CONSOLE_ENDPOINT.'/Console/Group/'.$groupId.'/Recipients';
 
-        $params = array(
-            'listguid' => $listGuid,
-            'list' => $listId,
-            'email' => $email,
-        );
-
-        return $this->callMethodFrontend($url, 'POST', $params);
+        return $this->callMethodREST($url, 'GET');
     }
 
     /**
-     * Unsubscribe from list.
+     * Create recipients into a group.
      *
-     * @param integer $listGuid
-     * @param integer $listId
-     * @param string  $email
+     * @param  integer $groupId
+     * @param  array   $recipients
      *
-     * @return mixed              REST Response
+     * @return mixed                REST Response
      */
-    public function unsubscribeFromListFrontEnd($listGuid, $listId, $email)
+    public function importRecipientsInGroup($groupId, array $recipients)
     {
-        $url = $this->consoleUrl.'frontend/xmlunsubscribe.aspx';
+        $url = self::CONSOLE_ENDPOINT.'/Console/Group/'.$groupId.'/Recipients';
 
-        $params = array(
-            'listguid' => $listGuid,
-            'list' => $listId,
-            'email' => $email,
-        );
-
-        return $this->callMethodFrontend($url, 'POST', $params);
-    }
-
-    /**
-     * Subscribe to list
-     * @param string $email
-     * @param mixed  $listIds Array of list ID or string with list id separated by comma.
-     * @param array  $params
-     *
-     * @return mixed          REST Response
-     */
-    public function subscribeToListFrontEnd($email, $listIds, array $params)
-    {
-        $url = $this->consoleUrl.'frontend/xmlSubscribe.aspx';
-
-        $params = $params + array(
-            'retcode' => '1',
-            'list' => is_array($listIds) ? implode(',', $listIds) : $listIds,
-            'email' => $email,
-        );
-
-        return $this->callMethodFrontend($url, 'POST', $params);
+        return $this->callMethodREST($url, 'POST', array(), $recipients);
     }
 
     /**
@@ -269,74 +304,35 @@ class MailUpClient extends MailUp
     }
 
     /**
-     * Get array of recipient in list paged.
+     * Update recipient.
      *
-     * @param  integer $listId
-     * @param  integer $pageSize
-     * @param  integer $pageNumber
-     * @param  string  $type
+     * @param  mixed $recipient
      *
-     * @return mixed                REST Response
+     * @return mixed            REST Response
      */
-    public function getListRecipientsPaged($listId, $pageSize = 100, $pageNumber = 0, $type = 'Subscribed')
+    public function updateRecipient($recipient)
     {
+        $url = self::CONSOLE_ENDPOINT.'/Console/Recipient/Detail';
+
+        return $this->callMethodREST($url, 'PUT', null, $recipient);
+    }
+
+    /**
+     * Get list of dynamic fields.
+     *
+     * @param  integer $pageSize
+     *
+     * @return mixed              REST Response
+     */
+    public function getFields($pageSize = 100)
+    {
+        $url = self::CONSOLE_ENDPOINT.'/Console/Recipient/DynamicFields';
+
         $params = array(
             'pageSize' => $pageSize,
-            'pageNumber' => $pageNumber,
+            'orderby' => 'Id',
         );
-
-        return $this->getListRecipients($listId, $type, $params);
-    }
-
-    /**
-     * Get array of recipient in list by status.
-     *
-     * @param  string $listId
-     * @param  string $status
-     * @param  array  $params
-     *
-     * @return mixed              REST Response
-     */
-    public function getListRecipients($listId, $status = 'Subscribed', $params = array())
-    {
-        $url = self::CONSOLE_ENDPOINT.'/Console/List/'.$listId.'/Recipients/'.$status;
 
         return $this->callMethodREST($url, 'GET', $params);
-    }
-
-    /**
-     * Enable WebService for current IP.
-     *
-     * @param  string $consoleUrl
-     *
-     * @return mixed              REST Response
-     */
-    public function enableWebServiceForCurrentIP($consoleUrl)
-    {
-        // Extract host, for 'nl_url' param
-        $parsedUrl = parse_url($consoleUrl);
-        $consoleHostname = empty($parsedUrl['host']) ? $consoleUrl : $parsedUrl['host'];
-
-        $params = array(
-            'usr' => $this->username,
-            'pwd' => $this->password,
-            'nl_url' => $consoleHostname,
-            'ws_name' => 'FrontEnd',
-        );
-
-        // Construct endpoint URL from console url
-        $endpointUrl = 'http://'.$consoleHostname.'/frontend/WSActivation.aspx';
-
-        $xml = $this->callMethodHTTP($endpointUrl, 'GET', $params);
-
-        if (isset($xml->mailupBody)) {
-            $code = (int) $xml->mailupBody->ReturnCode;
-            // Success
-            if ($code === 0) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
